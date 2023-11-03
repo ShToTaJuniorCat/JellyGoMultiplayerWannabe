@@ -1,6 +1,6 @@
 import pygame
 from time import time
-from constants import TOWER_CONSTANTS, BACKGROUND_COLOR
+from constants import *
 
 
 class JellyTower(pygame.sprite.Sprite):
@@ -18,18 +18,20 @@ class JellyTower(pygame.sprite.Sprite):
         Initialize a JellyTower object.
 
         Parameters:
-        - level (int): An integer representing the tower's level (1 to 5).
-        - owner (Player): A reference to the player who owns the tower.
-        - current_jellies (float): A float representing the current number of jellies in the tower.
-        - max_jellies (int): An integer representing the maximum jelly capacity of the tower.
-        - protection_factor (float): A float representing the tower's protection factor.
-        - sending_speed (int): An integer representing the tower's sending speed.
-        - production_speed (float): A float representing the tower's production speed.
-        - tower_image (str): A string representing the path to the tower_image of the tower's graphical representation.
+        - level (int): An integer representing the tower1's level (1 to 5).
+        - owner (Player): A reference to the player who owns the tower1.
+        - current_jellies (float): A float representing the current number of jellies in the tower1.
+        - max_jellies (int): An integer representing the maximum jelly capacity of the tower1.
+        - protection_factor (float): A float representing the tower1's protection factor.
+        - sending_speed (int): An integer representing the tower1's sending speed.
+        - production_speed (float): A float representing the tower1's production speed.
+        - tower_image (str): A string representing the path to the tower_image of the tower1's graphical representation.
         """
         super().__init__()
         self.tower_image = pygame.image.load(fr"../assets/images/towers/{tower_type}/level_{level}.png")
-        self.image = pygame.Surface((self.tower_image.get_width() + 5, self.tower_image.get_height()))
+        self.tower_image = self.scale_image_in_ratio(self.tower_image, TOWERS_WIDTH).convert_alpha()
+        self.image = pygame.Surface((self.tower_image.get_width() + 5,
+                                     self.tower_image.get_height() + ATTRIBUTES_SURFACE_HEIGHT))
         self.rect = self.image.get_rect()
         self.rect.topleft = (tower_x, tower_y)
 
@@ -45,102 +47,214 @@ class JellyTower(pygame.sprite.Sprite):
         self.upgrade_cost = TOWER_CONSTANTS[tower_type][level][4]
         self.tower_type = tower_type
         self.last_produced = 0
+        self.hovered = False
+        self.click_position = None
+        self.dirty = True
         try:
             self.time_between_production = 1 / production_speed
         except ZeroDivisionError:
             self.time_between_production = 99999999
 
+    @staticmethod
+    def scale_image_in_ratio(pygame_image: pygame.Surface, destination_width: int):
+        """
+        Scale a given python image or surface to have a destined width, while maintaining it's ratio.
+
+        :param pygame_image: pygame Surface object to scale
+        :param destination_width: Destined width for the Surface
+        :return: pygame.Surface
+        """
+        destination_height = (pygame_image.get_height() * destination_width) / pygame_image.get_width()
+
+        return pygame.transform.scale(pygame_image, (destination_width, destination_height))
+
+    def get_bounding_box(self):
+        return self.image.get_bounding_rect().move(self.tower_x, self.tower_y)
+
     def upgrade(self):
-        # Check if the tower is upgradable
+        # Check if the tower1 is upgradable
         if not self.is_upgradable():
             return False
 
         # Increment the level
         self.level += 1
 
-        # Retrieve the tower's attributes from the constant dictionary
+        # Retrieve the tower1's attributes from the constant dictionary
         attributes = TOWER_CONSTANTS[self.tower_type][self.level]
 
         # Unpack the attributes into respective variables
         self.protection_factor, self.sending_speed, self.production_speed, self.max_jellies, _ = attributes
-        self.tower_image = pygame.image.load(fr"../assets/images/towers/{self.tower_type}/level_{self.level}.png")
+        # Update tower production intervals
+        self.time_between_production = 1 / self.production_speed
 
         # Deduct the upgrade cost from the player's jellies
         self.current_jellies -= self.upgrade_cost
         self.upgrade_cost = TOWER_CONSTANTS[self.tower_type][self.level][4]
 
     def is_upgradable(self):
-        return self.current_jellies > self.upgrade_cost and self.level < len(TOWER_CONSTANTS[self.tower_type])
+        return self.current_jellies >= self.upgrade_cost and self.level < len(TOWER_CONSTANTS[self.tower_type])
 
-    def draw(self, surface: pygame.Surface):
-        # # Set the position of the tower on the surface
-        # tower_rect = self.tower_image.get_rect()
-        # tower_rect.topleft = (self.tower_x, self.tower_y)
-        # self.image_rect = tower_rect
-        #
-        # # Remove any previously drawings here
-        # pygame.draw.rect(surface, BACKGROUND_COLOR, (self.tower_x,
-        #                                              self.tower_y,
-        #                                              tower_rect.width,
-        #                                              tower_rect.height))
-        #
-        # # Draw the tower tower_image on the surface
-        # surface.blit(self.tower_image, tower_rect)
-        #
-        # # Display the current number of jellies (centered on the tower)
-        # jellies_text = pygame.font.Font(None, 36).render(str(int(self.current_jellies)), True, (255, 255, 255))
-        # jellies_rect = jellies_text.get_rect()
-        # jellies_rect.center = tower_rect.center  # Center the text on the tower
-        # surface.blit(jellies_text, jellies_rect)
+    def tick(self, cursor_position, clicked):
+        if self.rect.collidepoint(cursor_position):
+            self.hovered = True
+        else:
+            self.hovered = False
 
+        if clicked:
+            self.click_position = cursor_position
 
-
-        # Create a surface for the jellies bar and fill it with the owner's color
-        jellies_bar_surface = pygame.Surface((10, jellies_bar_height))
-        jellies_bar_surface.fill(self.owner.color)
-
-        # Set the position of the jellies bar on the tower's bottom-center
-        jellies_bar_rect = jellies_bar_surface.get_rect()
-        jellies_bar_rect.bottom = tower_rect.bottom
-        jellies_bar_rect.left = tower_rect.left
-
-        # Draw the jellies bar on the surface
-        surface.blit(jellies_bar_surface, jellies_bar_rect)
-
-        pygame.display.update()
-
-    def tick(self, surface: pygame.Surface):
-        self.upgrade()
-
-        # self.draw(surface)
         self.update_image()
+
+        self.click_position = None
+
+        # self.upgrade()
 
         if self.last_produced + self.time_between_production <= time():
             self.produce_jelly()
 
+        self.dirty = True
+
     def update_image(self):
         self.tower_image = pygame.image.load(fr"../assets/images/towers/{self.tower_type}/level_{self.level}.png")
-        self.image = pygame.Surface((self.tower_image.get_width() + 5, self.tower_image.get_height()))
+        self.tower_image = self.scale_image_in_ratio(self.tower_image, TOWERS_WIDTH).convert_alpha()
+        self.image = pygame.Surface((self.tower_image.get_width() + 5,
+                                     self.tower_image.get_height() +
+                                     UPGRADE_BUTTON_SIZE +
+                                     (UPGRADE_BUTTON_SIZE / 4) +
+                                     ATTRIBUTES_SURFACE_HEIGHT))
         self.rect = self.image.get_rect()
-        self.rect.topleft = (self.tower_x, self.tower_y)
+        self.rect.bottomright = (self.tower_x, self.tower_y)
 
-        self.image.blit(self.tower_image, (0, 0))
+        self.image.blit(self.tower_image, (0,
+                                           self.rect.height - self.tower_image.get_height() - ATTRIBUTES_SURFACE_HEIGHT))
 
-        # Display the current number of jellies (centered on the tower)
-        jellies_text = pygame.font.Font(None, 36).render(str(int(self.current_jellies)), True, (255, 255, 255))
-        jellies_rect = jellies_text.get_rect()
-        jellies_rect.center = self.rect.center  # Center the text on the tower
-        self.image.blit(jellies_text, jellies_rect)
+        # Display the current number of jellies (centered on the tower's center)
+        font_size = int((36 - ((len(str(int(self.current_jellies))) - 1) * 5)) * (TOWERS_WIDTH / 50))
+        jellies_text = pygame.font.Font(None, font_size).render(str(int(self.current_jellies)), True, (255, 255, 255))
+        # Calculate the position for blitting jellies_text at the center of self.image
+        text_width, text_height = jellies_text.get_size()
+        image_width, image_height = self.image.get_size()
+        # Blit the jellies_text onto self.image at the calculated position
+        self.image.blit(jellies_text, ((image_width - text_width) // 2 - 2,
+                                       image_height - TOWERS_CENTER_DOT - ATTRIBUTES_SURFACE_HEIGHT))
 
         # Calculate the height of the jellies bar
         jellies_bar_height = (self.current_jellies / self.max_jellies)
         jellies_bar_height = max(0.1, min(0.9, jellies_bar_height))  # height gotta be between 10%-90%
-        jellies_bar_height = int(jellies_bar_height * self.rect.height)
+        jellies_bar_height = int(jellies_bar_height * self.tower_image.get_height())
 
         jellies_bar = pygame.Rect(0, 0, 10, jellies_bar_height)
-        jellies_bar.bottomleft = (0, self.rect.height)
+        jellies_bar.bottomleft = (0, image_height - ATTRIBUTES_SURFACE_HEIGHT)
 
         pygame.draw.rect(self.image, self.owner.color, jellies_bar)
+
+        # Display upgrade indicator
+        if self.is_upgradable():
+            upgrade_indicator_image = pygame.image.load(r"../assets/images/icons/upgrade_indicator.png")
+            upgrade_indicator_image = self.scale_image_in_ratio(upgrade_indicator_image,
+                                                                UPGRADE_INDICATOR_SIZE).convert_alpha()
+            self.image.blit(upgrade_indicator_image, (self.rect.width - upgrade_indicator_image.get_width(),
+                                                      self.rect.height - upgrade_indicator_image.get_height() -
+                                                      ATTRIBUTES_SURFACE_HEIGHT))
+
+        # Display upgrade button and tower specifications
+        if self.hovered:
+            # Display upgrade button
+            upgrade_image = pygame.image.load(fr"../assets/images/icons/upgrade/{self.is_upgradable()}_upgrade.png")
+            upgrade_image = pygame.transform.scale(upgrade_image,
+                                                   (UPGRADE_BUTTON_SIZE, UPGRADE_BUTTON_SIZE)).convert_alpha()
+            self.image.blit(upgrade_image, ((image_width - upgrade_image.get_width()) // 2 - 2, 0))
+
+            # Handle mouse clicks
+            if self.click_position:
+                upgrade_image_x_range = range(int((image_width - upgrade_image.get_width()) / 2) +
+                                              self.tower_x - self.image.get_width(),
+                                              int((image_width - upgrade_image.get_width()) / 2) +
+                                              self.tower_x - self.image.get_width() + UPGRADE_BUTTON_SIZE)
+
+                upgrade_image_y_range = range(self.tower_y - self.image.get_height(),
+                                              self.tower_y - self.image.get_height() + UPGRADE_BUTTON_SIZE)
+
+                if self.click_position[0] in upgrade_image_x_range and self.click_position[1] in upgrade_image_y_range:
+                    self.upgrade()
+
+                # TODO: Select this tower upon click.
+
+            # Display tower attributes
+            attributes_surface = pygame.Surface((ATTRIBUTES_SURFACE_WIDTH, ATTRIBUTES_SURFACE_HEIGHT))
+
+            # Attributes background
+            pygame.draw.rect(attributes_surface, (1, 1, 1),
+                             pygame.Rect(0, 0, ATTRIBUTES_SURFACE_WIDTH, ATTRIBUTES_SURFACE_HEIGHT),
+                             int(ATTRIBUTES_SURFACE_HEIGHT / 2) + 1, 3)
+
+            # Production speed
+            attr_image = pygame.image.load(r"../assets/images/icons/tower_attributes/production.png").convert_alpha()
+            attr_image = pygame.transform.scale(attr_image, (ATTRIBUTES_ICON_SIZE, ATTRIBUTES_ICON_SIZE))
+            attributes_surface.blit(attr_image,
+                                    (attributes_surface.get_width() / 5 - ATTRIBUTES_ICON_SIZE,
+                                     attributes_surface.get_height() / 2 - 1.5 * ATTRIBUTES_ICON_SIZE))
+            # Text
+            font_size = int(ATTRIBUTES_SURFACE_HEIGHT / 2)
+            attr_text = pygame.font.Font(None, font_size).render(str(self.production_speed), True,
+                                                                    (255, 255, 255))
+            # Blit the jellies_text onto self.image at the calculated position
+            attributes_surface.blit(attr_text, (attr_image.get_rect().topright[0] + 10,
+                                                attributes_surface.get_height() / 2 - 1.5 * ATTRIBUTES_ICON_SIZE))
+
+            self.image.blit(attributes_surface, (0, image_height - ATTRIBUTES_SURFACE_HEIGHT))
+
+            # Storage capacity
+            attr_image = pygame.image.load(r"../assets/images/icons/tower_attributes/capacity.png").convert_alpha()
+            attr_image = pygame.transform.scale(attr_image, (ATTRIBUTES_ICON_SIZE, ATTRIBUTES_ICON_SIZE))
+            attributes_surface.blit(attr_image,
+                                    (4 * attributes_surface.get_width() / 5 - 1.5 * ATTRIBUTES_ICON_SIZE,
+                                     attributes_surface.get_height() / 2 - 1.5 * ATTRIBUTES_ICON_SIZE))
+            # Text
+            attr_text = pygame.font.Font(None, font_size).render(str(int(self.max_jellies)), True,
+                                                                    (255, 255, 255))
+            # Blit the jellies_text onto self.image at the calculated position
+            attributes_surface.blit(attr_text, (4 * attributes_surface.get_width() / 5 - 0.2 * ATTRIBUTES_ICON_SIZE,
+                                                attributes_surface.get_height() / 2 - 1.3 * ATTRIBUTES_ICON_SIZE))
+
+            self.image.blit(attributes_surface, (0, image_height - ATTRIBUTES_SURFACE_HEIGHT))
+
+            # Protection speed
+            attr_image = pygame.image.load(r"../assets/images/icons/tower_attributes/shield.png").convert_alpha()
+            attr_image = pygame.transform.scale(attr_image, (ATTRIBUTES_ICON_SIZE, ATTRIBUTES_ICON_SIZE))
+            attributes_surface.blit(attr_image,
+                                    (attributes_surface.get_width() / 5 - ATTRIBUTES_ICON_SIZE,
+                                     attributes_surface.get_height() - 1.5 * ATTRIBUTES_ICON_SIZE))
+            # Text
+            font_size = int(ATTRIBUTES_SURFACE_HEIGHT / 2)
+            attr_text = pygame.font.Font(None, font_size).render(str(int(self.protection_factor)), True,
+                                                                 (255, 255, 255))
+            # Blit the jellies_text onto self.image at the calculated position
+            attributes_surface.blit(attr_text, (attr_image.get_rect().topright[0] + 10,
+                                                attributes_surface.get_height() - 1.5 * ATTRIBUTES_ICON_SIZE))
+
+            self.image.blit(attributes_surface, (0, image_height - ATTRIBUTES_SURFACE_HEIGHT))
+
+            # Sending speed
+            attr_image = pygame.image.load(r"../assets/images/icons/tower_attributes/speed.png").convert_alpha()
+            attr_image = pygame.transform.scale(attr_image, (ATTRIBUTES_ICON_SIZE, ATTRIBUTES_ICON_SIZE))
+            attributes_surface.blit(attr_image,
+                                    (4 * attributes_surface.get_width() / 5 - 1.5 * ATTRIBUTES_ICON_SIZE,
+                                     attributes_surface.get_height() - 1.5 * ATTRIBUTES_ICON_SIZE))
+            # Text
+            font_size = int(ATTRIBUTES_SURFACE_HEIGHT / 2)
+            attr_text = pygame.font.Font(None, font_size).render(str(int(self.sending_speed)), True,
+                                                                 (255, 255, 255))
+            # Blit the jellies_text onto self.image at the calculated position
+            attributes_surface.blit(attr_text, (4 * attributes_surface.get_width() / 5 - 0.2 * ATTRIBUTES_ICON_SIZE,
+                                                attributes_surface.get_height() - 1.5 * ATTRIBUTES_ICON_SIZE))
+
+            self.image.blit(attributes_surface, (0, image_height - ATTRIBUTES_SURFACE_HEIGHT))
+
+        # Set the alpha transparency flag
+        self.image = self.image.convert()
+        self.image.set_colorkey((0, 0, 0))  # Set the background color to be transparent
+        self.image.set_alpha(255)  # You can adjust the alpha value as needed
 
     def produce_jelly(self):
         self.last_produced = time()
