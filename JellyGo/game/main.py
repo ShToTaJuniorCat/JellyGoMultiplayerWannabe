@@ -34,12 +34,9 @@ tower_group.add(tower2)
 
 tower_group.draw(screen)
 
-towers_bounding_boxes = []
-for tower in tower_group:
-    print(tower.get_bounding_box())
-
 run = True
 clicked = False
+mouse_pos = None
 while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -52,8 +49,20 @@ while run:
         if event.type == pygame.MOUSEBUTTONUP:
             clicked = True
 
+    mouse_pos = pygame.mouse.get_pos()
     for tower in tower_group:
-        tower.tick(pygame.mouse.get_pos(), clicked)
+        if tower.get_bounding_box().collidepoint((mouse_pos)):
+            tower.hovered = True
+
+            if clicked:
+                tower.click_position = mouse_pos
+
+                if tower.get_tower_bounding_box().collidepoint((mouse_pos)):
+                    print("SELECTED")
+        else:
+            tower.hovered = False
+
+        tower.tick()
 
     # tower2.dirty = True
     tower_group.clear(screen, screen)

@@ -68,8 +68,12 @@ class JellyTower(pygame.sprite.Sprite):
 
         return pygame.transform.scale(pygame_image, (destination_width, destination_height))
 
+    def get_tower_bounding_box(self):
+        return self.tower_image.get_bounding_rect().move(self.tower_image.get_width(),
+                                                         self.tower_image.get_height())
+
     def get_bounding_box(self):
-        return self.image.get_bounding_rect().move(self.tower_x, self.tower_y)
+        return self.image.get_bounding_rect().move(self.rect.topleft)
 
     def upgrade(self):
         # Check if the tower1 is upgradable
@@ -94,18 +98,8 @@ class JellyTower(pygame.sprite.Sprite):
     def is_upgradable(self):
         return self.current_jellies >= self.upgrade_cost and self.level < len(TOWER_CONSTANTS[self.tower_type])
 
-    def tick(self, cursor_position, clicked):
-        if self.rect.collidepoint(cursor_position):
-            self.hovered = True
-        else:
-            self.hovered = False
-
-        if clicked:
-            self.click_position = cursor_position
-
+    def tick(self):
         self.update_image()
-
-        self.click_position = None
 
         # self.upgrade()
 
