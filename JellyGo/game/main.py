@@ -58,12 +58,21 @@ while run:
         if event.type == pygame.MOUSEBUTTONUP:
             clicked = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            selection_area_start = pygame.mouse.get_pos()
-             selected_towers = []
+            for tower in tower_group:
+                if tower.get_tower_bounding_box().collidepoint(pygame.mouse.get_pos()):
+                    break
+            else:
+                selection_area_start = pygame.mouse.get_pos()
+                selected_towers = []
 
     tower_clicked = False
     mouse_pos = pygame.mouse.get_pos()
     for tower in tower_group:
+        tower.tick()
+
+        if selection_area_start:
+            continue
+
         if tower.get_bounding_box().collidepoint(mouse_pos):
             tower.hovered = True
             tower_clicked = True
@@ -73,16 +82,12 @@ while run:
 
                 if tower.get_tower_bounding_box().collidepoint(mouse_pos):
                     if not selected_towers:
-                        print(selected_towers)
                         selected_towers.append(tower)
                     else:
-                        print("Send jellies to this tower!")
                         selected_towers = []
 
         else:
             tower.hovered = False
-
-        tower.tick()
 
     if selection_area_start:
         end_x, end_y = pygame.mouse.get_pos()
@@ -103,6 +108,12 @@ while run:
         if clicked:
             if selection_area_start:
                 print(f"Select area from {selection_area_start} to {pygame.mouse.get_pos()}")
+                for tower in tower_group:
+                    tower_x, tower_y, tower_width, tower_height = tower.get_tower_bounding_box()
+                    tower_mid_x = tower_x + (tower_width / 2)
+                    tower_mid_y = tower_y + (tower_height / 2)
+                    print(tower_mid_x, tower_mid_y)
+
                 selection_area_start = None
             else:
                 selected_towers = []
