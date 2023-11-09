@@ -13,7 +13,9 @@ class JellyTower(pygame.sprite.Sprite):
                  protection_factor: float,
                  sending_speed: int,
                  production_speed: float,
-                 tower_type: str):
+                 tower_type: str,
+                 is_current_player: bool,
+                 layer: int = 1):
         """
         Initialize a JellyTower object.
 
@@ -50,6 +52,8 @@ class JellyTower(pygame.sprite.Sprite):
         self.hovered = False
         self.click_position = None
         self.dirty = True
+        self.layer = layer
+        self.is_current_player = is_current_player
         try:
             self.time_between_production = 1 / production_speed
         except ZeroDivisionError:
@@ -100,6 +104,9 @@ class JellyTower(pygame.sprite.Sprite):
         self.upgrade_cost = TOWER_CONSTANTS[self.tower_type][self.level][4]
 
     def is_upgradable(self):
+        if self.tower_type == "house":
+            return False
+
         return self.current_jellies >= self.upgrade_cost and self.level < len(TOWER_CONSTANTS[self.tower_type])
 
     def tick(self):
@@ -134,7 +141,7 @@ class JellyTower(pygame.sprite.Sprite):
         image_width, image_height = self.image.get_size()
         # Blit the jellies_text onto self.image at the calculated position
         self.image.blit(jellies_text, ((image_width - text_width) // 2 - 2,
-                                       image_height - TOWERS_CENTER_DOT - ATTRIBUTES_SURFACE_HEIGHT))
+                                       image_height - TOWERS_TEXT_CENTER - ATTRIBUTES_SURFACE_HEIGHT))
 
         # Calculate the height of the jellies bar
         jellies_bar_height = (self.current_jellies / self.max_jellies)
@@ -147,7 +154,7 @@ class JellyTower(pygame.sprite.Sprite):
         pygame.draw.rect(self.image, self.owner.color, jellies_bar)
 
         # Display upgrade indicator
-        if self.is_upgradable():
+        if self.is_upgradable() and self.is_current_player:
             upgrade_indicator_image = pygame.image.load(r"../assets/images/icons/upgrade_indicator.png")
             upgrade_indicator_image = self.scale_image_in_ratio(upgrade_indicator_image,
                                                                 UPGRADE_INDICATOR_SIZE).convert_alpha()
@@ -157,26 +164,27 @@ class JellyTower(pygame.sprite.Sprite):
 
         # Display upgrade button and tower specifications
         if self.hovered:
-            # Display upgrade button
-            upgrade_image = pygame.image.load(fr"../assets/images/icons/upgrade/{self.is_upgradable()}_upgrade.png")
-            upgrade_image = pygame.transform.scale(upgrade_image,
-                                                   (UPGRADE_BUTTON_SIZE, UPGRADE_BUTTON_SIZE)).convert_alpha()
-            self.image.blit(upgrade_image, ((image_width - upgrade_image.get_width()) // 2 - UPGRADE_BUTTON_MARGIN, 0))
+            if self.is_current_player:
+                # Display upgrade button
+                upgrade_image = pygame.image.load(fr"../assets/images/icons/upgrade/{self.is_upgradable()}_upgrade.png")
+                upgrade_image = pygame.transform.scale(upgrade_image,
+                                                       (UPGRADE_BUTTON_SIZE, UPGRADE_BUTTON_SIZE)).convert_alpha()
+                self.image.blit(upgrade_image, ((image_width - upgrade_image.get_width()) // 2 - UPGRADE_BUTTON_MARGIN, 0))
 
-            # Handle mouse clicks
-            if self.click_position:
-                upgrade_image_x_range = range(int((image_width - upgrade_image.get_width()) / 2) +
-                                              self.tower_x - self.image.get_width(),
-                                              int((image_width - upgrade_image.get_width()) / 2) +
-                                              self.tower_x - self.image.get_width() + UPGRADE_BUTTON_SIZE)
+                # Handle mouse clicks
+                if self.click_position:
+                    upgrade_image_x_range = range(int((image_width - upgrade_image.get_width()) / 2) +
+                                                  self.tower_x - self.image.get_width(),
+                                                  int((image_width - upgrade_image.get_width()) / 2) +
+                                                  self.tower_x - self.image.get_width() + UPGRADE_BUTTON_SIZE)
 
-                upgrade_image_y_range = range(self.tower_y - self.image.get_height(),
-                                              self.tower_y - self.image.get_height() + UPGRADE_BUTTON_SIZE)
+                    upgrade_image_y_range = range(self.tower_y - self.image.get_height(),
+                                                  self.tower_y - self.image.get_height() + UPGRADE_BUTTON_SIZE)
 
-                if self.click_position[0] in upgrade_image_x_range and self.click_position[1] in upgrade_image_y_range:
-                    self.upgrade()
+                    if self.click_position[0] in upgrade_image_x_range and self.click_position[1] in upgrade_image_y_range:
+                        self.upgrade()
 
-                self.click_position = None
+                    self.click_position = None
 
             # Display tower attributes
             attributes_surface = pygame.Surface((ATTRIBUTES_SURFACE_WIDTH, ATTRIBUTES_SURFACE_HEIGHT))
