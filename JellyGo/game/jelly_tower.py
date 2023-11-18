@@ -274,3 +274,16 @@ class JellyTower(pygame.sprite.Sprite):
 
         if int(self.current_jellies) == self.max_jellies:
             self.current_jellies = self.max_jellies
+
+    def send_jellies(self, amount: float):
+        """
+        Send the specified amount of jellies.
+        :param amount: Either 0.5 or 1. 0.5 corresponds to sending half the tower's jellies, 1 - all of them.
+        """
+
+        self.current_jellies -= self.current_jellies * amount
+
+    def receive_jellies(self, amount: int):
+        self.current_jellies += amount
+
+        # TODO: Check if the tower is captured and act accordingly
