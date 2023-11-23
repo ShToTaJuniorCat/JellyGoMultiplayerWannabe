@@ -112,8 +112,6 @@ class JellyTower(pygame.sprite.Sprite):
     def tick(self):
         self.update_image()
 
-        # self.upgrade()
-
         if self.last_produced + self.time_between_production <= time():
             self.produce_jelly()
 
@@ -280,8 +278,10 @@ class JellyTower(pygame.sprite.Sprite):
         Send the specified amount of jellies.
         :param amount: Either 0.5 or 1. 0.5 corresponds to sending half the tower's jellies, 1 - all of them.
         """
+        sent = self.current_jellies * amount
+        self.current_jellies -= sent
 
-        self.current_jellies -= self.current_jellies * amount
+        return sent
 
     def receive_jellies(self, amount: int):
         self.current_jellies += amount
