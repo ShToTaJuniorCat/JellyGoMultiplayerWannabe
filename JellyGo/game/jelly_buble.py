@@ -58,7 +58,7 @@ class JellyBubble(pygame.sprite.Sprite):
                                             self.rect.height - self.bubble_image.get_height()))
 
         # Display the current number of jellies (centered on the tower's center)
-        font_size = int((36 - ((len(str(int(self.amount))) - 1) * 5)) * (JELLY_BUBBLE_WIDTH / 50))
+        font_size = int((36 - ((len(str(int(self.amount))) - 1) * 5)) * (JELLY_BUBBLE_WIDTH / 20))
         jellies_text = pygame.font.Font(None, font_size).render(str(int(self.amount)), True, (255, 255, 255))
         # Calculate the position for blitting jellies_text at the center of self.image
         text_width, text_height = jellies_text.get_size()

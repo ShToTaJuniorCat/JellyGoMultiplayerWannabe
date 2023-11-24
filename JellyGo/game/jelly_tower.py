@@ -72,10 +72,15 @@ class JellyTower(pygame.sprite.Sprite):
 
         return pygame.transform.scale(pygame_image, (destination_width, destination_height))
 
-    def get_tower_bounding_box(self):
-        return self.tower_image.get_bounding_rect()\
-            .move(self.rect.topleft[0],
-                  self.rect.topleft[1] + UPGRADE_BUTTON_SIZE + UPGRADE_BUTTON_MARGIN)
+    def get_tower_bounding_box(self, post_loading=True):
+        if post_loading:
+            return self.tower_image.get_bounding_rect() \
+                .move(self.rect.topleft[0],
+                      self.rect.topleft[1] + UPGRADE_BUTTON_SIZE + UPGRADE_BUTTON_MARGIN)
+        else:
+            return self.tower_image.get_bounding_rect() \
+                .move(self.rect.topleft[0] - TOWERS_WIDTH,
+                  self.rect.topleft[1] - ATTRIBUTES_SURFACE_HEIGHT - self.tower_image.get_height())
 
     def get_bounding_box(self):
         return self.image.get_bounding_rect().move(self.rect.topleft)
@@ -163,11 +168,14 @@ class JellyTower(pygame.sprite.Sprite):
         # Display upgrade button and tower specifications
         if self.hovered:
             if self.is_current_player:
-                # Display upgrade button
-                upgrade_image = pygame.image.load(fr"../assets/images/icons/upgrade/{self.is_upgradable()}_upgrade.png")
-                upgrade_image = pygame.transform.scale(upgrade_image,
-                                                       (UPGRADE_BUTTON_SIZE, UPGRADE_BUTTON_SIZE)).convert_alpha()
-                self.image.blit(upgrade_image, ((image_width - upgrade_image.get_width()) // 2 - UPGRADE_BUTTON_MARGIN, 0))
+                if self.level < len(TOWER_CONSTANTS[self.tower_type]):
+                    # Display upgrade button
+                    upgrade_image = pygame.image.load(
+                        fr"../assets/images/icons/upgrade/{self.is_upgradable()}_upgrade.png")
+                    upgrade_image = pygame.transform.scale(upgrade_image,
+                                                           (UPGRADE_BUTTON_SIZE, UPGRADE_BUTTON_SIZE)).convert_alpha()
+                    self.image.blit(upgrade_image,
+                                    ((image_width - upgrade_image.get_width()) // 2 - UPGRADE_BUTTON_MARGIN, 0))
 
                 # Handle mouse clicks
                 if self.click_position:
