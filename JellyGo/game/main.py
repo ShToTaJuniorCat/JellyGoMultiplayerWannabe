@@ -1,17 +1,46 @@
 from os import environ
-import matplotlib.pyplot as plt
 import pygame
 from jelly_tower import JellyTower
 from player import Player
 from constants import *
 from obstacle import Obstacle
 import numpy as np
-from pathfinder import astar
-from time import time
+from pathfinder import a_star_search
 from jelly_buble import JellyBubble
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 
 environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (WINDOW_POSITION_X, WINDOW_POSITION_Y)
+
+
+def compress_map(compression_factor, input_map):
+    rows = len(input_map)
+    cols = len(input_map[0])
+
+    # Create an output map with dimensions reduced by the compression factor
+    compressed_rows = (rows + compression_factor - 1) // compression_factor
+    compressed_cols = (cols + compression_factor - 1) // compression_factor
+    output_map = [[0] * compressed_cols for _ in range(compressed_rows)]
+
+    for i in range(0, rows, compression_factor):
+        for j in range(0, cols, compression_factor):
+            # Extract the pixel group
+            pixel_group = [input_map[x][y] for x in range(i, min(i + compression_factor, rows)) for y in range(j, min(j + compression_factor, cols))]
+
+            # Count the occurrences of 0 and 1 in the pixel group
+            count_0 = pixel_group.count(0)
+            count_1 = pixel_group.count(1)
+
+            # Determine the dominant pixel value
+            dominant_pixel = 0 if count_0 > count_1 else 1
+
+            # Set the value of the pixel in the compressed map
+            compressed_row = i // compression_factor
+            compressed_col = j // compression_factor
+            output_map[compressed_row][compressed_col] = dominant_pixel
+
+    return output_map
 
 
 def is_point_inside_polygon(x, y, vertices):
@@ -29,6 +58,20 @@ def is_point_inside_polygon(x, y, vertices):
     return intersections % 2 == 1
 
 
+def convert_returned_path_to_usable(tuple_list):
+    return [(COMPRESSION_FACTOR * y, COMPRESSION_FACTOR * x) for x, y in tuple_list]
+
+
+def process_tower(sending_tower, receiving_tower, amount, local_pixel_map):
+    print(f"Sending tower {sending_tower}")
+    amount_sent = sending_tower.send_jellies(amount)
+    path = convert_returned_path_to_usable(a_star_search(
+        local_pixel_map, tuple(int(value / COMPRESSION_FACTOR) for value in sending_tower.rect.center),
+        tuple(int(value / COMPRESSION_FACTOR) for value in receiving_tower.rect.center)))
+    bubble = JellyBubble(path, sending_tower.sending_speed, sending_tower.owner, amount_sent, receiving_tower)
+    jelly_bubble_group.add(bubble)
+
+
 def send_jellies(sending_towers, receiving_tower, amount):
     local_pixel_map = screen_pixels
     for tower in sending_towers + [receiving_tower]:
@@ -38,19 +81,18 @@ def send_jellies(sending_towers, receiving_tower, amount):
         # Iterate through the bounding box and mark pixels within the tower
         for x in range(tower_rect.left, tower_rect.right):
             for y in range(tower_rect.top, tower_rect.bottom):
-                local_pixel_map[y][x] = 0  # Mark this pixel as walkable path
+                local_pixel_map[y][x] = 1  # Mark this pixel as walkable path
+
+    compressed_pixel_map = compress_map(COMPRESSION_FACTOR, local_pixel_map)
 
     # Display jelly sending animation
-    for tower in sending_towers:
-        # Subtract amount from the towers
-        amount_sent = tower.send_jellies(amount)
+    # Create partially bound function
+    partial_process_tower = partial(process_tower, receiving_tower=receiving_tower, amount=amount,
+                                    local_pixel_map=compressed_pixel_map)
 
-        print(tower.rect.center, receiving_tower.rect.center)
-        path = astar(local_pixel_map, tower.rect.center, receiving_tower.rect.center)
-
-        # Create a JellyBubble instance representing sent jellies
-        bubble = JellyBubble(path, tower.sending_speed, tower.owner, amount_sent, receiving_tower)
-        jelly_bubble_group.add(bubble)
+    # Call the ThreadPoolExecutor
+    with ThreadPoolExecutor() as executor:
+        executor.map(partial_process_tower, sending_towers)
 
 
 # Initialize pygame screen
@@ -133,7 +175,7 @@ obst3 = Obstacle([(35, 505), (25, 505), (25, 495), (35, 495)], RED)
 obstacles_list = [obst]
 
 # Find screen pixel's state: 0 for possible passage, 1 for no passage
-screen_pixels = np.zeros((SCREEN_HEIGHT, SCREEN_WIDTH))
+screen_pixels = np.ones((SCREEN_HEIGHT, SCREEN_WIDTH))
 
 for obstacle in obstacles_list:
     vertices = obstacle.vertices
@@ -146,7 +188,7 @@ for obstacle in obstacles_list:
     for x in range(max(0, min_x), min(SCREEN_WIDTH, max_x) + 1):
         for y in range(max(0, min_y), min(SCREEN_HEIGHT, max_y) + 1):
             if is_point_inside_polygon(x, y, vertices):
-                screen_pixels[y][x] = 1
+                screen_pixels[y][x] = 0
 
     for player_towers in towers_by_player:
         for tower in player_towers:
@@ -156,11 +198,9 @@ for obstacle in obstacles_list:
             # Iterate through the bounding box and mark pixels within the tower
             for x in range(tower_rect.left, tower_rect.left + TOWERS_WIDTH):
                 for y in range(tower_rect.top, tower_rect.top + tower_rect.height):
-                    screen_pixels[y][x] = 1  # Mark this pixel as within a tower
+                    screen_pixels[y][x] = 0  # Mark this pixel as within a tower
 
 jelly_bubble_group = pygame.sprite.LayeredUpdates()
-
-np.savetxt('pixels.txt', screen_pixels, fmt='%.f', delimiter='')
 
 selected_towers = []
 run = True

@@ -1,151 +1,145 @@
-# Credit for this: Nicholas Swift
-# as found at https://medium.com/@nicholas.w.swift/easy-a-star-pathfinding-7e6689c7f7b2
-import time
-from warnings import warn
+import math
 import heapq
-from copy import deepcopy
 import pygame
+import random
+import numpy as np
+import time
 
 
-class Node:
-    """
-    A node class for A* Pathfinding
-    """
-
-    def __init__(self, parent=None, position=None):
-        self.parent = parent
-        self.position = position
-
-        self.g = 0
-        self.h = 0
-        self.f = 0
-
-    def __eq__(self, other):
-        return self.position == other.position
-
-    def __repr__(self):
-        return f"{self.position} - g: {self.g} h: {self.h} f: {self.f}"
-
-    # defining less than for purposes of heap queue
-    def __lt__(self, other):
-        return self.f < other.f
-
-    # defining greater than for purposes of heap queue
-    def __gt__(self, other):
-        return self.f > other.f
+class Cell:
+    def __init__(self, parent_i=0, parent_j=0, f=0, g=0, h=0):
+        self.parent_i = parent_i
+        self.parent_j = parent_j
+        self.f = f
+        self.g = g
+        self.h = h
 
 
-def return_path(current_node):
+def is_valid(row, col, max_row, max_col):
+    return 0 <= row < max_row and 0 <= col < max_col
+
+
+def is_unblocked(grid, row, col):
+    return grid[row][col] == 1
+
+
+def is_destination(row, col, destination):
+    return row == destination[0] and col == destination[1]
+
+
+def calculate_h_value(row, col, destination):
+    return math.sqrt((row - destination[0]) ** 2 + (col - destination[1]) ** 2)
+
+
+def trace_path(cell_details, destination):
+    row, col = destination
     path = []
-    current = current_node
-    while current is not None:
-        path.append(current.position)
-        current = current.parent
-    return path[::-1]  # Return reversed path
+
+    while not (cell_details[row][col].parent_i == row and cell_details[row][col].parent_j == col):
+        path.append((row, col))
+        row, col = cell_details[row][col].parent_i, cell_details[row][col].parent_j
+
+    path.append((row, col))
+    returned_path = [(p[0], p[1] - 1) if p[0] == 2 or p[0] == 1 else (p[0], p[1]) for p in path[::-1]]
+
+    return returned_path
 
 
-def astar(maze, start, end, allow_diagonal_movement=False):
-    """
-    Returns a list of tuples as a path from the given start to the given end in the given maze
-    :param maze:
-    :param start:
-    :param end:
-    :return:
-    """
-    maze_copy = deepcopy(maze)
+def a_star_search(grid, src, destination):
+    print(f"Until search called: {time.time() - start_time}")
 
-    # Create start and end node
-    start_node = Node(None, start)
-    start_node.g = start_node.h = start_node.f = 0
-    end_node = Node(None, end)
-    end_node.g = end_node.h = end_node.f = 0
+    max_row, max_col = len(grid), len(grid[0])
+    #src = [src[1], src[0]]
+    #destination = [destination[1], destination[0]]
 
-    # Initialize both open and closed list
-    open_list = []
-    closed_list = []
+    if not (is_valid(src[0], src[1], max_row, max_col) and is_valid(destination[0], destination[1], max_row, max_col)):
+        print("Source or destination is invalid")
+        return
 
-    # Heapify the open_list and Add the start node
-    heapq.heapify(open_list)
-    heapq.heappush(open_list, start_node)
+    if not (is_unblocked(grid, src[0], src[1]) and is_unblocked(grid, destination[0], destination[1])):
+        print("Source or destination is blocked")
+        return
 
-    # Adding a stop condition
-    outer_iterations = 0
-    max_iterations = (len(maze[0]) * len(maze) // 2)
+    if is_destination(src[0], src[1], destination):
+        print("Already at the destination")
+        return []
 
-    # what squares do we search
-    adjacent_squares = ((0, -1), (0, 1), (-1, 0), (1, 0),)
-    if allow_diagonal_movement:
-        adjacent_squares = ((0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1),)
+    print(f"Until after bound checks: {time.time() - start_time}")
 
-    # Loop until you find the end
-    while len(open_list) > 0:
-        outer_iterations += 1
+    closed_list = [[False for _ in range(max_col)] for _ in range(max_row)]
+    cell_details = [[Cell() for _ in range(max_col)] for _ in range(max_row)]
 
-        if outer_iterations > max_iterations:
-            # if we hit this point return the path such as it is
-            # it will not contain the destination
-            warn("giving up on pathfinding too many iterations")
-            return return_path(current_node)
+    print(f"Until before for loop: {time.time() - start_time}")
 
-            # Get the current node
-        current_node = heapq.heappop(open_list)
-        # maze_copy[current_node.position[0]][current_node.position[1]] = 0.5
-        #
-        # pygame.draw.rect(screen, (255 * maze_copy[current_node.position[0]][current_node.position[1]],) * 3,
-        #                          pygame.Rect(current_node.position[1], current_node.position[0], 1, 1))
+    for i in range(max_row):
+        for j in range(max_col):
+            cell_details[i][j].f = math.inf
+            cell_details[i][j].g = math.inf
+            cell_details[i][j].h = math.inf
+            cell_details[i][j].parent_i = -1
+            cell_details[i][j].parent_j = -1
+
+    i, j = src[0], src[1]
+    cell_details[i][j].f = 0
+    cell_details[i][j].g = 0
+    cell_details[i][j].h = 0
+    cell_details[i][j].parent_i = i
+    cell_details[i][j].parent_j = j
+
+    open_list = [(0, i, j)]
+
+    print(f"Until search started: {time.time() - start_time}")
+
+    while open_list:
+        _, i, j = heapq.heappop(open_list)
+        closed_list[i][j] = True
+
+        successors = [
+            (i - 1, j), (i + 1, j), (i, j + 1), (i, j - 1),
+            (i - 1, j + 1), (i - 1, j - 1), (i + 1, j + 1), (i + 1, j - 1)
+        ]
+
+        # screen.set_at((j, i), (0, 0, 255))
+        # pygame.draw.circle(screen, (255, 255, 0), (src[1], src[0]), 3)
+        # pygame.draw.circle(screen, (255, 255, 0), (destination[1], destination[0]), 3)
         # pygame.display.update()
 
-        closed_list.append(current_node)
+        for successor in successors:
+            row, col = successor
 
-        # Found the goal
-        if current_node == end_node:
-            return return_path(current_node)
+            if is_valid(row, col, max_row, max_col) and is_unblocked(grid, row, col):
+                if is_destination(row, col, destination):
+                    cell_details[row][col].parent_i = i
+                    cell_details[row][col].parent_j = j
+                    return trace_path(cell_details, destination)
 
-        # Generate children
-        children = []
+                if not closed_list[row][col]:
+                    g_new = cell_details[i][j].g + 1 if i == row or j == col else cell_details[i][j].g + 1.414
+                    h_new = calculate_h_value(row, col, destination)
+                    f_new = g_new + h_new
 
-        for new_position in adjacent_squares:  # Adjacent squares
+                    if cell_details[row][col].f == math.inf or cell_details[row][col].f > f_new:
+                        heapq.heappush(open_list, (f_new, row, col))
+                        cell_details[row][col].f = f_new
+                        cell_details[row][col].g = g_new
+                        cell_details[row][col].h = h_new
+                        cell_details[row][col].parent_i = i
+                        cell_details[row][col].parent_j = j
 
-            # Get node position
-            node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
+    print("Failed to find the Destination Cell")
 
-            # Make sure within range
-            if node_position[0] > (len(maze) - 1) or node_position[0] < 0 or node_position[1] > (
-                    len(maze[len(maze) - 1]) - 1) or node_position[1] < 0:
-                continue
+def choose_random_index_optimized(matrix):
+        # Convert the matrix to a NumPy array
+        np_matrix = np.array(matrix)
 
-            # Make sure walkable terrain
-            if maze[node_position[0]][node_position[1]] != 0:
-                continue
+        # Find indices with value 1 using NumPy's argwhere
+        indices_with_ones = np.argwhere(np_matrix == 1)
 
-            # Create new node
-            new_node = Node(current_node, node_position)
-
-            # Append
-            children.append(new_node)
-
-        # Loop through children
-        for child in children:
-            # Child is on the closed list
-            if len([closed_child for closed_child in closed_list if closed_child == child]) > 0:
-                continue
-
-            # Create the f, g, and h values
-            child.g = current_node.g + 1
-            child.h = ((child.position[0] - end_node.position[0]) ** 2) + (
-                        (child.position[1] - end_node.position[1]) ** 2)
-            child.f = child.g + child.h
-
-            # Child is already in the open list
-            if len([open_node for open_node in open_list if
-                    child.position == open_node.position and child.g > open_node.g]) > 0:
-                continue
-
-            # Add the child to the open list
-            heapq.heappush(open_list, child)
-
-    warn("Couldn't get a path to destination")
-    return None
+        # Choose a random index with value 1
+        if indices_with_ones.size > 0:
+            return tuple(indices_with_ones[random.randint(0, indices_with_ones.shape[0] - 1)])
+        else:
+            return None  # No index with value 1 found
 
 
 def example(print_maze=False):
@@ -166,31 +160,30 @@ def example(print_maze=False):
     #         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, ],
     #         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, ]]
 
-    # Initialize an empty maze list
-    maze = []
+    if display_progress:
+        # Draw the maze
+        for row_index, row in enumerate(maze):
+            for col_index, col in enumerate(row):
+                pygame.draw.rect(screen, (255 * maze[row_index][col_index],) * 3,
+                                 pygame.Rect(col_index, row_index, 1, 1))
 
-    # Open the file for reading
-    with open('pixels.txt', 'r') as file:
-        # Iterate over each line in the file
-        for line in file:
-            # Create a list for the current row and append each digit as an integer
-            row = [int(digit) for digit in line.strip()]
+    points = [(253, 367), (334, 1150), (253, 1612),
+              (522, 367), (541, 628), (522, 908), (541, 1365), (523, 1612),
+              (788, 367), (714, 1148), (779, 1612)]
+    start = random.choice(points)
+    end = random.choice(points)
 
-            # Append the row to the maze
-            maze.append(row)
+    print(start, end)
 
-    # Draw the maze
-    for row_index, row in enumerate(maze):
-        for col_index, col in enumerate(row):
-            pygame.draw.rect(screen, (255 * maze[row_index][col_index],) * 3,
-                             pygame.Rect(col_index, row_index, 1, 1))
+    if display_progress:
+        pygame.draw.circle(screen, (255, 255, 0), (start[1], start[0]), 3)
+        pygame.draw.circle(screen, (255, 255, 0), (end[1], end[0]), 3)
+        pygame.display.update()
 
-    pygame.display.update()
+    print("Start")
 
-    start = (212, 492)
-    end = (507, 124)
-
-    path = astar(maze, start, end)
+    path = a_star_search(maze, start, end)
+    print(f"Total time: {time.time() - start_time}")
 
     if print_maze:
         for step in path:
@@ -210,8 +203,24 @@ def example(print_maze=False):
 
 # Problems: (212, 492) (507, 124)
 if __name__ == "__main__":
+    # Initialize an empty maze list
+    maze = []
+    display_progress = False
+    start_time = time.time()
+
+    # Open the file for reading
+    with open(r'pixels.txt', 'r') as file:
+        # Iterate over each line in the file
+        for line in file:
+            # Create a list for the current row and append each digit as an integer
+            maze_row = [int(digit) for digit in line.strip()]
+
+            # Append the row to the maze
+            maze.append(maze_row)
+
     # Initialize pygame screen
-    pygame.init()
-    screen = pygame.display.set_mode((1920, 1080))
+    if display_progress:
+        pygame.init()
+        screen = pygame.display.set_mode((1920, 1080))
 
     example()
