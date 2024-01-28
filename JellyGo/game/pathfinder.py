@@ -7,7 +7,7 @@ import time
 
 
 class Cell:
-    def __init__(self, parent_i=0, parent_j=0, f=0, g=0, h=0):
+    def __init__(self, parent_i=-1, parent_j=-1, f=math.inf, g=math.inf, h=math.inf):
         self.parent_i = parent_i
         self.parent_j = parent_j
         self.f = f
@@ -15,131 +15,114 @@ class Cell:
         self.h = h
 
 
-def is_valid(row, col, max_row, max_col):
-    return 0 <= row < max_row and 0 <= col < max_col
+class Pathfinder:
+    def __init__(self, grid, is_unblocked):
+        self.grid = grid
+        self.is_unblocked_function = is_unblocked
+        self.max_row = len(grid)
+        self.max_col = len(grid[0])
+        self.closed_list = []
+        self.cell_details = None
 
+    def initialize_values(self):
+        # self.closed_list = np.full((self.max_row, self.max_col), False, dtype=bool)
+        print(f"Until cell details: {time.time() - start_time}")
+        self.cell_details = [[Cell() for _ in range(self.max_col)] for _ in range(self.max_row)]
 
-def is_unblocked(grid, row, col):
-    return grid[row][col] == 1
+    def is_valid(self, row, col):
+        return 0 <= row < self.max_row and 0 <= col < self.max_col
 
+    def is_unblocked(self, row, col):
+        return self.grid[row][col] == 1
 
-def is_destination(row, col, destination):
-    return row == destination[0] and col == destination[1]
+    @staticmethod
+    def is_destination(row, col, destination):
+        return row == destination[0] and col == destination[1]
 
+    @staticmethod
+    def calculate_h_value(row, col, destination):
+        return math.sqrt((row - destination[0]) ** 2 + (col - destination[1]) ** 2)
 
-def calculate_h_value(row, col, destination):
-    return math.sqrt((row - destination[0]) ** 2 + (col - destination[1]) ** 2)
+    @staticmethod
+    def trace_path(cell_details, destination):
+        row, col = destination
+        path = []
 
+        while not (cell_details[row][col].parent_i == row and cell_details[row][col].parent_j == col):
+            path.append((row, col))
+            row, col = cell_details[row][col].parent_i, cell_details[row][col].parent_j
 
-def trace_path(cell_details, destination):
-    row, col = destination
-    path = []
-
-    while not (cell_details[row][col].parent_i == row and cell_details[row][col].parent_j == col):
         path.append((row, col))
-        row, col = cell_details[row][col].parent_i, cell_details[row][col].parent_j
+        returned_path = [(p[0], p[1] - 1) if p[0] == 2 or p[0] == 1 else (p[0], p[1]) for p in path[::-1]]
 
-    path.append((row, col))
-    returned_path = [(p[0], p[1] - 1) if p[0] == 2 or p[0] == 1 else (p[0], p[1]) for p in path[::-1]]
+        return returned_path
 
-    return returned_path
+    def a_star_search(self, src, destination):
+        # src = [src[1], src[0]]
+        # destination = [destination[1], destination[0]]
 
+        if not (self.is_valid(src[0], src[1]) and self.is_valid(destination[0], destination[1])):
+            print("Source or destination is invalid")
+            return
 
-def a_star_search(grid, src, destination):
-    print(f"Until search called: {time.time() - start_time}")
+        if not (self.is_unblocked_function(src[0], src[1]) and self.is_unblocked_function(destination[0], destination[1])):
+            print("Source or destination is blocked")
+            return
 
-    max_row, max_col = len(grid), len(grid[0])
-    #src = [src[1], src[0]]
-    #destination = [destination[1], destination[0]]
+        if self.is_destination(src[0], src[1], destination):
+            print("Already at the destination")
+            return []
 
-    if not (is_valid(src[0], src[1], max_row, max_col) and is_valid(destination[0], destination[1], max_row, max_col)):
-        print("Source or destination is invalid")
-        return
+        i, j = src[0], src[1]
+        self.cell_details[i][j].f = 0
+        self.cell_details[i][j].g = 0
+        self.cell_details[i][j].h = 0
+        self.cell_details[i][j].parent_i = i
+        self.cell_details[i][j].parent_j = j
 
-    if not (is_unblocked(grid, src[0], src[1]) and is_unblocked(grid, destination[0], destination[1])):
-        print("Source or destination is blocked")
-        return
+        open_list = [(0, i, j)]
+        heapq.heapify(open_list)
 
-    if is_destination(src[0], src[1], destination):
-        print("Already at the destination")
-        return []
+        print(f"Until search started: {time.time() - start_time}")
 
-    print(f"Until after bound checks: {time.time() - start_time}")
+        while open_list:
+            _, i, j = heapq.heappop(open_list)
+            self.closed_list.append((i, j))
 
-    closed_list = [[False for _ in range(max_col)] for _ in range(max_row)]
-    cell_details = [[Cell() for _ in range(max_col)] for _ in range(max_row)]
+            successors = [
+                (i - 1, j), (i + 1, j), (i, j + 1), (i, j - 1),
+                (i - 1, j + 1), (i - 1, j - 1), (i + 1, j + 1), (i + 1, j - 1)
+            ]
 
-    print(f"Until before for loop: {time.time() - start_time}")
+            # screen.set_at((j, i), (0, 0, 255))
+            # pygame.draw.circle(screen, (255, 255, 0), (src[1], src[0]), 3)
+            # pygame.draw.circle(screen, (255, 255, 0), (destination[1], destination[0]), 3)
+            # pygame.display.update()
 
-    for i in range(max_row):
-        for j in range(max_col):
-            cell_details[i][j].f = math.inf
-            cell_details[i][j].g = math.inf
-            cell_details[i][j].h = math.inf
-            cell_details[i][j].parent_i = -1
-            cell_details[i][j].parent_j = -1
+            for successor in successors:
+                row, col = successor
 
-    i, j = src[0], src[1]
-    cell_details[i][j].f = 0
-    cell_details[i][j].g = 0
-    cell_details[i][j].h = 0
-    cell_details[i][j].parent_i = i
-    cell_details[i][j].parent_j = j
+                if self.is_valid(row, col) and self.is_unblocked_function(row, col):
+                    if self.is_destination(row, col, destination):
+                        self.cell_details[row][col].parent_i = i
+                        self.cell_details[row][col].parent_j = j
+                        print("V Pathfinding finished correctly.")
+                        return self.trace_path(self.cell_details, destination)
 
-    open_list = [(0, i, j)]
+                    if (i, j) in self.closed_list:
+                        g_new = self.cell_details[i][j].g + 1 if i == row or j == col else self.cell_details[i][j].g + 1.414
+                        h_new = self.calculate_h_value(row, col, destination)
+                        f_new = g_new + h_new
 
-    print(f"Until search started: {time.time() - start_time}")
+                        if self.cell_details[row][col].f == math.inf or self.cell_details[row][col].f > f_new:
+                            heapq.heappush(open_list, (f_new, row, col))
+                            self.cell_details[row][col].f = f_new
+                            self.cell_details[row][col].g = g_new
+                            self.cell_details[row][col].h = h_new
+                            self.cell_details[row][col].parent_i = i
+                            self.cell_details[row][col].parent_j = j
 
-    while open_list:
-        _, i, j = heapq.heappop(open_list)
-        closed_list[i][j] = True
-
-        successors = [
-            (i - 1, j), (i + 1, j), (i, j + 1), (i, j - 1),
-            (i - 1, j + 1), (i - 1, j - 1), (i + 1, j + 1), (i + 1, j - 1)
-        ]
-
-        # screen.set_at((j, i), (0, 0, 255))
-        # pygame.draw.circle(screen, (255, 255, 0), (src[1], src[0]), 3)
-        # pygame.draw.circle(screen, (255, 255, 0), (destination[1], destination[0]), 3)
-        # pygame.display.update()
-
-        for successor in successors:
-            row, col = successor
-
-            if is_valid(row, col, max_row, max_col) and is_unblocked(grid, row, col):
-                if is_destination(row, col, destination):
-                    cell_details[row][col].parent_i = i
-                    cell_details[row][col].parent_j = j
-                    return trace_path(cell_details, destination)
-
-                if not closed_list[row][col]:
-                    g_new = cell_details[i][j].g + 1 if i == row or j == col else cell_details[i][j].g + 1.414
-                    h_new = calculate_h_value(row, col, destination)
-                    f_new = g_new + h_new
-
-                    if cell_details[row][col].f == math.inf or cell_details[row][col].f > f_new:
-                        heapq.heappush(open_list, (f_new, row, col))
-                        cell_details[row][col].f = f_new
-                        cell_details[row][col].g = g_new
-                        cell_details[row][col].h = h_new
-                        cell_details[row][col].parent_i = i
-                        cell_details[row][col].parent_j = j
-
-    print("Failed to find the Destination Cell")
-
-def choose_random_index_optimized(matrix):
-        # Convert the matrix to a NumPy array
-        np_matrix = np.array(matrix)
-
-        # Find indices with value 1 using NumPy's argwhere
-        indices_with_ones = np.argwhere(np_matrix == 1)
-
-        # Choose a random index with value 1
-        if indices_with_ones.size > 0:
-            return tuple(indices_with_ones[random.randint(0, indices_with_ones.shape[0] - 1)])
-        else:
-            return None  # No index with value 1 found
+        print("X Failed to find the Destination Cell")
 
 
 def example(print_maze=False):
@@ -171,18 +154,19 @@ def example(print_maze=False):
               (522, 367), (541, 628), (522, 908), (541, 1365), (523, 1612),
               (788, 367), (714, 1148), (779, 1612)]
     start = random.choice(points)
+    points.remove(start)
     end = random.choice(points)
-
-    print(start, end)
 
     if display_progress:
         pygame.draw.circle(screen, (255, 255, 0), (start[1], start[0]), 3)
         pygame.draw.circle(screen, (255, 255, 0), (end[1], end[0]), 3)
         pygame.display.update()
 
-    print("Start")
-
-    path = a_star_search(maze, start, end)
+    pathfinder = Pathfinder(maze, is_unblocked)
+    print(f"Start initialization: {time.time() - start_time}")
+    pathfinder.initialize_values()
+    print(f"Call a*: {time.time() - start_time}")
+    path = pathfinder.a_star_search(start, end)
     print(f"Total time: {time.time() - start_time}")
 
     if print_maze:
@@ -199,6 +183,10 @@ def example(print_maze=False):
                 elif col == 2:
                     line.append(".")
             print("".join(line))
+
+
+def is_unblocked(row, col):
+    return maze[row][col] == 1
 
 
 # Problems: (212, 492) (507, 124)
